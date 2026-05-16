@@ -1,0 +1,229 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import whisper
+import pyttsx3
+import random
+
+app = Flask(__name__)
+CORS(app)
+
+model = whisper.load_model("base")
+
+# =========================
+# 100 HR Interview Questions
+# =========================
+
+questions = [
+    "Tell me about yourself",
+    "What are your strengths",
+    "What are your weaknesses",
+    "Why should we hire you",
+    "Why do you want to work here",
+    "Where do you see yourself in 5 years",
+    "Explain your latest project",
+    "Tell me about a challenge you faced",
+    "Describe yourself in one word",
+    "What motivates you",
+    "What are your career goals",
+    "Why did you choose this field",
+    "Tell me about your leadership experience",
+    "How do you handle pressure",
+    "What is your biggest achievement",
+    "What makes you unique",
+    "Describe a difficult situation at work",
+    "How do you manage time",
+    "What are your hobbies",
+    "Tell me about your teamwork skills",
+    "How do you handle criticism",
+    "What is success for you",
+    "What is failure for you",
+    "How do you prioritize tasks",
+    "What do you know about our company",
+    "Why did you leave your previous role",
+    "Describe your communication skills",
+    "Tell me about a conflict you resolved",
+    "How quickly do you learn new technology",
+    "What is your dream job",
+    "How do you stay updated with technology",
+    "Tell me about your internship",
+    "Describe your work ethic",
+    "What are your salary expectations",
+    "Are you willing to relocate",
+    "How do you handle deadlines",
+    "Tell me about a time you failed",
+    "What did you learn from mistakes",
+    "Describe your ideal work environment",
+    "What are your technical skills",
+    "How do you solve problems",
+    "Tell me about your college project",
+    "Describe a time you showed leadership",
+    "How do you work in a team",
+    "What is your biggest strength",
+    "What is your biggest weakness",
+    "How do you handle stress",
+    "Why are you interested in this role",
+    "Tell me something not on your resume",
+    "How do you define hard work",
+    "What are your short term goals",
+    "What are your long term goals",
+    "What do you do in your free time",
+    "How do you manage multiple tasks",
+    "Tell me about a proud moment",
+    "Describe your decision making process",
+    "What kind of manager do you prefer",
+    "How do you deal with disagreements",
+    "What inspires you",
+    "How do you adapt to change",
+    "Describe your learning process",
+    "What programming languages do you know",
+    "Tell me about your favorite project",
+    "How do you handle failure",
+    "What is your leadership style",
+    "What are your expectations from this company",
+    "How do you improve your skills",
+    "Tell me about your responsibilities",
+    "How do you approach new challenges",
+    "Describe your creativity",
+    "How do you maintain work life balance",
+    "What are your future plans",
+    "What does teamwork mean to you",
+    "How do you stay motivated",
+    "Tell me about your achievements",
+    "Describe a stressful situation",
+    "How do you deal with difficult people",
+    "What do you value most in a workplace",
+    "What is your management style",
+    "Tell me about a successful project",
+    "How do you communicate with teammates",
+    "Describe your personality",
+    "How do you handle rejection",
+    "What are your strengths as a leader",
+    "What is your greatest accomplishment",
+    "Describe a risk you took",
+    "How do you react to feedback",
+    "Tell me about a time you helped someone",
+    "What is your favorite technology",
+    "How do you organize your work",
+    "Tell me about your education",
+    "What skills would you like to improve",
+    "Describe your adaptability",
+    "How do you ensure quality work",
+    "Tell me about a difficult decision",
+    "What do you expect from a manager",
+    "How do you build relationships at work",
+    "What is your proudest achievement",
+    "Tell me about a time you worked under pressure",
+    "How do you contribute to a team",
+    "Describe your problem solving skills",
+    "Why are you the best candidate"
+]
+
+# Shuffle questions randomly
+random.shuffle(questions)
+
+current_question = 0
+question_served = False
+
+
+# =========================
+# Text to Speech
+# =========================
+
+def speak_text(text):
+
+    engine = pyttsx3.init()
+
+    voices = engine.getProperty('voices')
+
+    # Female voice usually index 1 on Windows
+    if len(voices) > 1:
+        engine.setProperty('voice', voices[0].id)
+
+    engine.setProperty('rate', 170)
+
+    engine.say(text)
+
+    engine.runAndWait()
+
+    engine.stop()
+
+
+# =========================
+# Get Question API
+# =========================
+
+@app.route("/question", methods=["GET"])
+def get_question():
+
+    global current_question, question_served
+
+    if current_question >= len(questions):
+        final_message = "Interview Finished"
+        speak_text(final_message)
+        return jsonify({"question": final_message})
+
+    question = questions[current_question]
+
+    if not question_served:
+        speak_text(question)
+        question_served = True
+
+    return jsonify({
+        "question_number": current_question + 1,
+        "question": question
+    })
+
+
+# =========================
+# Transcribe API
+# =========================
+
+@app.route("/transcribe", methods=["POST"])
+def transcribe():
+
+    global current_question, question_served
+
+    audio = request.files["audio"]
+
+    file_path = "temp.wav"
+
+    audio.save(file_path)
+
+    result = model.transcribe(file_path, language="en")
+
+    text = result["text"]
+
+    current_question += 1
+
+    question_served = False
+
+    return jsonify({
+        "transcript": text
+    })
+
+
+# =========================
+# Restart Interview API
+# =========================
+
+@app.route("/restart", methods=["GET"])
+def restart_interview():
+
+    global current_question, question_served, questions
+
+    current_question = 0
+    question_served = False
+
+    random.shuffle(questions)
+
+    return jsonify({
+        "message": "Interview restarted with random questions"
+    })
+
+
+# =========================
+# Main
+# =========================
+
+if __name__ == "__main__":
+    app.run(debug=True)
