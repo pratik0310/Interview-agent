@@ -1,9 +1,13 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from faster_whisper import WhisperModel
-import pyttsx3
 import random
 import threading
+import asyncio
+import edge_tts
+import pygame
+import uuid
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -21,6 +25,12 @@ model = WhisperModel(
 )
 
 print("Model loaded!")
+
+# =========================
+# Pygame Mixer Init
+# =========================
+
+pygame.mixer.init()
 
 # =========================
 # 100 HR Interview Questions
@@ -137,7 +147,7 @@ current_question = 0
 question_served = False
 
 # =========================
-# TTS — dummy warmup then real
+# TTS — edge-tts + pygame ✅
 # =========================
 
 tts_lock = threading.Lock()
@@ -145,16 +155,17 @@ tts_lock = threading.Lock()
 def speak_text(text):
     def _speak():
         with tts_lock:
-            eng = pyttsx3.init()
-            voices = eng.getProperty('voices')
-            if len(voices) > 1:
-                eng.setProperty('voice', voices[0].id)
-            eng.setProperty('rate', 150)
-            eng.say(" ")        # ✅ dummy run warms audio driver
-            eng.runAndWait()    # ✅ driver fully ready
-            eng.say(text)       # ✅ real text no cut
-            eng.runAndWait()
-            eng.stop()
+            filename = f"speech_{uuid.uuid4().hex}.mp3"
+            async def _run():
+                communicate = edge_tts.Communicate(text, voice="en-US-JennyNeural")
+                await communicate.save(filename)
+            asyncio.run(_run())
+            pygame.mixer.music.load(filename)
+            pygame.mixer.music.play()
+            while pygame.mixer.music.get_busy():   # ✅ wait full playback
+                pygame.time.Clock().tick(10)
+            pygame.mixer.music.unload()
+            os.remove(filename)                    # ✅ cleanup
     threading.Thread(target=_speak, daemon=True).start()
 
 
