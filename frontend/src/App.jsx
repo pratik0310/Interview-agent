@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
+import ResultsPage from "./ResultsPage";
 
 function App() {
   const [question, setQuestion] = useState("");
   const [transcript, setTranscript] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [showResults, setShowResults] = useState(false);  // ✅
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const hasFetched = useRef(false);
@@ -18,6 +20,10 @@ function App() {
   const fetchQuestion = async () => {
     try {
       const response = await axios.get("http://127.0.0.1:5000/question");
+      if (response.data.finished) {
+        setShowResults(true);                              // ✅ switch to results
+        return;
+      }
       setQuestion(response.data.question);
     } catch (err) {
       console.error("Failed to fetch question", err);
@@ -60,6 +66,19 @@ function App() {
       mediaRecorderRef.current.stop();
     }
   };
+
+  const handleRestart = () => {
+    setShowResults(false);                                 // ✅ back to interview
+    setQuestion("");
+    setTranscript("");
+    hasFetched.current = false;
+    fetchQuestion();
+  };
+
+  // ✅ show results page after 10 questions
+  if (showResults) {
+    return <ResultsPage onRestart={handleRestart} />;
+  }
 
   return (
     <div style={{ padding: "40px", fontFamily: "Arial" }}>
